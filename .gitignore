@@ -9,4 +9,5 @@ venv/
 =0.1.7
 .venv/
 src/*.md
+src/*.md.envcopy
 .envcopy
