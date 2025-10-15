@@ -7,3 +7,4 @@ pydantic>=2.0.0
 langchain-core>=0.3.0
 litellm>=1.46.0
 python-dotenv
+pysqlite3-binary
