@@ -21,7 +21,10 @@ policy_retriever:
   allow_delegation: false
 
 conversation_manager:
-  role: Intent Detector
-  goal: Analyze employee queries and classify them into appropriate HR tasks
-  backstory: An AI trained to understand and categorize HR-related questions efficiently
+  role: >
+    Intent Detector
+  goal: >
+    Analyze employee queries and classify them into appropriate HR tasks
+  backstory: >
+    An AI trained to understand and categorize HR-related questions efficiently
   allow_delegation: false

@@ -1,2 +1,32 @@
 [project]
 name = "hr_bot"
+version = "0.1.0"
+description = "HR policy assistant powered by CrewAI and Azure OpenAI embeddings"
+requires-python = ">=3.10,<3.13"
+
+dependencies = [
+    "crewai[tools]>=0.120.1,<1.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "gunicorn",
+    "sse-starlette>=1.6.5",
+    "pydantic>=2.0.0",
+    "langchain-core>=0.3.0",
+    "litellm>=1.46.0",
+    "python-dotenv",
+]
+
+[project.scripts]
+hr_bot = "hr_bot.main:run"
+run_crew = "hr_bot.main:run"
+train = "hr_bot.main:train"
+replay = "hr_bot.main:replay"
+test = "hr_bot.main:test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"
+

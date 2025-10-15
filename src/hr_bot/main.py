@@ -1,9 +1,22 @@
+# Override system sqlite3 with pysqlite3 for Chroma compatibility
+try:
+    import sys
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3  # Replace sqlite3 module entirely
+    import sqlite3
+    print(f"✅ Overridden SQLite with pysqlite3 version: {sqlite3.sqlite_version}")
+except ImportError:
+    print("⚠️ pysqlite3 not installed; falling back to system SQLite (may fail with Chroma)")
+
 import os
 import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+from hr_bot.crew import HRCrew
+from hr_bot.flows.hr_query_flow import HRQueryFlow
 
 # Load environment variables
 load_dotenv()
@@ -21,14 +34,6 @@ app = FastAPI(
     version="1.0"
 )
 
-try:
-    from hr_bot.crew import HRCrew
-    hr_crew = HRCrew()
-    logger.info("✅ HR Crew initialized successfully.")
-except Exception as e:
-    hr_crew = None
-    logger.error(f"❌ Failed to initialize HR Crew: {e}")
-
 # ---------------------------------------------------------------------
 # Request model
 # ---------------------------------------------------------------------
@@ -44,21 +49,20 @@ async def root():
 
 @app.post("/ask")
 async def ask_hr_bot(request: QueryRequest):
-    if not hr_crew:
-        raise HTTPException(status_code=500, detail="HR Crew not initialized. Check server logs.")
+    """Endpoint to ask HR-related questions."""
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    logger.info(f"Received question: {question}")
 
     try:
-        logger.info(f"📩 Received query =======> {request.question}")
-
-        # Await the async handle_query method
-        result = await hr_crew.handle_query_async(request.question)
-
-        logger.info(f"✅ Response ========> {result}")
-        return {"response": result}
+        hr_flow = HRQueryFlow()
+        answer = hr_flow.run_dynamic_task(question)
+        return {"question": question, "answer": answer}
     except Exception as e:
-        logger.exception("Error while processing HR query")
+        logger.error(f"❌ Error running HR query flow: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 # ---------------------------------------------------------------------

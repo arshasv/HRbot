@@ -1,63 +1,87 @@
-from crewai.flow.flow import Flow, start, listen
-import asyncio
 import logging
+from crewai import Crew, Process
+from hr_bot.crew import HRCrew
+from hr_bot.core.llm_config import llm
 
 logger = logging.getLogger(__name__)
 
-class HRQueryFlow(Flow):
-    """
-    Handles HR query resolution:
-      1. Detects intent via conversation_manager
-      2. Executes the relevant HR task
-    """
+class HRQueryFlow:
+    def __init__(self):
+        self.hr_crew_instance = HRCrew()
+        self.crew = self.hr_crew_instance.crew()
+        self.hr_policy_pdf = self.hr_crew_instance.hr_policy_pdf
+        self.embedder = self.hr_crew_instance.embedder
 
-    def __init__(self, agents, tasks):
-        super().__init__()
-        self.agents = agents
-        self.tasks = tasks
-        self.conversation_manager = agents["conversation_manager"]
+    def detect_intent(self, query: str) -> str:
+        """Run intent detection using the conversation_manager agent."""
+        try:
+            cm = self.hr_crew_instance.conversation_manager()
+            logger.info("🔍 Running intent detection...")
+            result = cm.kickoff(
+                f"Classify this HR question into: leave_task, benefits_task, "
+                f"compliance_task, onboarding_task, performance_task, or employee_policy_task.\n\n"
+                f"Question: {query}\n\nReturn only the task name."
+            )
+            return result.raw.strip().lower()
+        except Exception as e:
+            logger.error(f"❌ Intent detection failed: {e}")
+            return "unclassified"
 
-    # ------------------------- STEP 1 -------------------------
-    @start()
-    async def detect_intent(self):
-        """Detect which HR task the query belongs to."""
-        query = self.state.get("query")
-        if not query:
-            raise ValueError("❌ Missing 'query' in flow state.")
+    def run_dynamic_task(self, query: str):
+        """Dynamically run the correct HR policy task after intent detection."""
+        intent = self.detect_intent(query)
+        logger.info(f"Intent detected: {intent}")
 
-        logger.info(f"🔍 Detecting intent for query: {query}")
+        if intent == "unclassified":
+            return "Sorry, I couldn’t classify your question into a known HR policy area."
 
-        prompt = (
-            "You are an HR assistant. Analyze the employee's question and determine which HR task it belongs to. "
-            "Choose one of: leave_task, benefits_task, compliance_task, onboarding_task, "
-            "performance_task, or employee_policy_task.\n\n"
-            f"Employee question: {query}\n\n"
-            "Return only the task name (e.g., 'leave_task')."
-        )
+        try:
+            # Dynamically get the task from HRCrew (e.g. leave_task)
+            task_method = getattr(self.hr_crew_instance, intent, None)
+            if not task_method:
+                return f"⚠️ No task found for intent: {intent}"
 
-        logger.info("🧠 Running intent detection LLM call...")
-        # ✅ Run synchronous LLM call in a separate thread
-        result = await asyncio.to_thread(self.conversation_manager.llm.call, prompt)
-        logger.info(f"🧠 Intent detection result: {result}")
-        cleaned = result.strip().lower()
+            # Instantiate the task and inject the query into its description
+            task = task_method()
+            if hasattr(task, "description") and "{query}" in task.description:
+                task.description = task.description.replace("{query}", query)
 
-        # Save to state for next step
-        self.state["task_name"] = cleaned
-        print(f"✅ Intent detected ==========================> {cleaned}")
+            # Get the agent for this task
+            agent_name_or_obj = getattr(task, "agent", None)
 
-        return cleaned
+            if agent_name_or_obj is None:
+                return f"⚠️ Task {intent} does not specify an agent."
 
-    # ------------------------- STEP 2 -------------------------
-    @listen(detect_intent)
-    async def execute_task(self):
-        task_name = self.state.get("task_name")
-        query = self.state.get("query")
+            # Handle both string agent names and Agent objects
+            if isinstance(agent_name_or_obj, str):
+                agent_method = getattr(self.hr_crew_instance, agent_name_or_obj, None)
+                if not agent_method:
+                    return f"⚠️ No agent found for task: {agent_name_or_obj}"
+                agent = agent_method()
+            elif hasattr(agent_name_or_obj, "kickoff"):  # already an Agent instance
+                agent = agent_name_or_obj
+            else:
+                return f"⚠️ Invalid agent configuration for task: {intent}"
 
-        if not task_name or task_name not in self.tasks:
-            return "Sorry, I couldn't map your question to a defined HR category."
 
-        # Use HRCrew's run_task
-        hr_crew = self.state.get("hr_crew")
-        result = await hr_crew.run_task(task_name, query)
-        return result
+            # Create a mini crew for this query and mention the knowledge source and to take only from it
+            mini_crew = Crew(
+                agents=[agent],
+                tasks=[task],
+                process=Process.sequential,
+                verbose=True,
+                memory=False,
+                llm=llm,
+                adapted_agent=True,
+                knowledge_sources=[self.hr_crew_instance.hr_policy_pdf],
+                collection_name="hr_policy_collection",
+                embedder=self.embedder,
+                )
 
+            # Run the crew
+            result = mini_crew.kickoff()
+            return result.output if hasattr(result, "output") else result
+
+        except Exception as e:
+            logger.error(f"❌ Failed to run dynamic task: {e}", exc_info=True)
+            return f"An error occurred while processing your request: {e}"

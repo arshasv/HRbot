@@ -1,73 +1,82 @@
 employee_policy_task:
   description: >
-    Retrieve and summarize the requested HR policy from the official HR policy
-    documents using the RAGPolicyTool. Ensure the explanation is accurate,
-    compliant, and easy for non-HR staff to understand. If the employee asks
-    about a specific clause, provide the exact section and context.
+    Retrieve and summarize the requested HR policy *only from the official HR policy PDF*
+    using the provided knowledge source. Do not use general HR knowledge.
+    Cite the exact section, clause, or heading from the document wherever possible.
+    If the PDF does not contain the information, respond that it is not specified.
 
     The specific employee question is: {query}
   expected_output: >
-    A concise, plain-language summary of the requested HR policy with clear
-    references to the source document and clause numbers where applicable.
+    A concise, PDF-grounded explanation of the requested HR policy with
+    clear references to the source section or clause number.
   agent: policy_retriever
 
 leave_task:
   description: >
-    Answer employee questions about leave policies, including sick leave,
-    vacation leave, and emergency leave. Ensure all responses strictly follow
-    the company’s official HR policy. Use empathetic tone and clarify any
-    approval procedures.
+    Retrieve and summarize the leave policy *only from the official HR policy PDF*.
+    Include entitlements, approvals, and eligibility exactly as specified.
+    Do not generate or infer information not present in the PDF.
 
     The specific employee question is: {query}
   expected_output: >
-    A complete explanation of leave entitlements, conditions, and procedures,
-    formatted as a short employee-facing note.
-  agent: hr_expert
+    A precise, PDF-grounded summary of leave policy with references to sections or clauses.
+  agent: policy_retriever
 
 benefits_task:
   description: >
-    Explain employee benefits such as healthcare, retirement plans,
-    allowances, and bonuses. Ensure details match official HR policy documents
-    and current company offerings.
+    Retrieve and summarize the employee benefits policy *only from the official HR policy PDF*.
+    Include healthcare, retirement plans, allowances, and bonuses exactly as specified.
+    Do not generate or infer information not present in the PDF.
 
     The specific employee question is: {query}
   expected_output: >
-    A well-structured summary or list of relevant benefits, including
-    eligibility rules and any limitations.
-  agent: hr_expert
+    A precise, PDF-grounded summary of employee benefits with references to sections or clauses.
+  agent: policy_retriever
 
 compliance_task:
   description: >
-    Handle compliance-related employee queries, referencing both internal
-    HR policies and applicable labor regulations. Ensure answers are legally
-    accurate and clearly connected to the company’s compliance framework.
+    Retrieve and summarize compliance-related policies *only from the official HR policy PDF*.
+    Ensure answers are legally accurate and reference the correct company policy clauses.
+    Do not generate or infer information not present in the PDF.
 
     The specific employee question is: {query}
   expected_output: >
-    A policy-compliant answer referencing the correct company regulation or
-    legal clause in plain language.
-  agent: hr_expert
+    A legally accurate, PDF-grounded response addressing the compliance issue, with references to relevant sections or clauses.
+  agent: policy_retriever
 
 onboarding_task:
   description: >
-    Support new employees during onboarding by explaining the steps, required
-    documents, internal systems, and key contacts. Personalize guidance based
-    on the employee’s role or department.
+    Retrieve and summarize onboarding steps and requirements *only from the official HR policy PDF*.
+    Include documents, internal systems, and key contacts exactly as specified.
+    Do not generate or infer information not present in the PDF.
 
     The specific employee question is: {query}
   expected_output: >
-    A clear, actionable onboarding checklist or step-by-step guide for
-    the new hire’s first week.
-  agent: hr_expert
+    A precise, PDF-grounded onboarding guide tailored to the employee’s role, with references to sections or clauses.
+  agent: policy_retriever
 
 performance_task:
   description: >
-    Provide detailed information about performance evaluations, review
-    schedules, rating criteria, and career development opportunities. Emphasize
-    fairness, transparency, and growth.
+    Retrieve and summarize performance evaluation policies *only from the official HR policy PDF*.
+    Include review schedules, rating criteria, and development opportunities exactly as specified.
+    Do not generate or infer information not present in the PDF.
 
     The specific employee question is: {query}
   expected_output: >
-    A structured explanation of the performance review process, timeline,
-    and evaluation criteria presented in an easy-to-follow format.
-  agent: hr_expert
+    A precise, PDF-grounded summary of performance evaluation processes, criteria, and development opportunities with references to sections or clauses.
+  agent: policy_retriever
+
+intent_detection_task:
+  description: >
+    Analyze the employee's query and classify it into one of the following HR tasks:
+    - employee_policy_task
+    - leave_task
+    - benefits_task
+    - compliance_task
+    - onboarding_task
+    - performance_task
+    If the query does not fit any of these categories, respond with "unclassified".
+  expected_output: >
+    Return only the task name that best matches the employee's query from the list above,
+    or "unclassified" if none match.
+  agent: conversation_manager
