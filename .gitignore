@@ -11,3 +11,4 @@ venv/
 src/*.md
 src/*.md.envcopy
 .envcopy
+.envcopy
